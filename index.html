@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <canvas id="canvas" width="800" height="600" style="border:1px solid #000;"></canvas>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const peer = new Peer(); // Connects to public PeerJS server
+        let conn;
+
+        // Draw function
+        function draw(x, y) {
+            ctx.fillRect(x, y, 5, 5);
+        }
+
+        // Send mouse position to peer
+        canvas.addEventListener('mousemove', (e) => {
+            if (e.buttons === 1) {
+                draw(e.offsetX, e.offsetY);
+                if (conn && conn.open) {
+                    conn.send({x: e.offsetX, y: e.offsetY});
+                }
+            }
+        });
+
+        // Listen for incoming connections (Host)
+        peer.on('connection', (c) => {
+            conn = c;
+            conn.on('data', (data) => draw(data.x, data.y));
+        });
+
+        // Function to connect to a specific ID (Client)
+        function connectToPeer(peerId) {
+            conn = peer.connect(peerId);
+            conn.on('open', () => {
+                conn.on('data', (data) => draw(data.x, data.y));
+            });
+        }
+
+        // Log ID to share
+        peer.on('open', (id) => console.log('My ID:', id));
+    </script>
+</body>
+</html>
