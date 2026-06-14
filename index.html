@@ -1,45 +1,77 @@
 <!DOCTYPE html>
 <html>
 <body>
+    <div id="ui">
+        <input type="text" id="roomName" placeholder="Enter Room Name">
+        <button onclick="hostRoom()">Create Room</button>
+        <button onclick="joinRoom()">Join Room</button>
+        <p>Current Room: <span id="display">None</span></p>
+    </div>
     <canvas id="canvas" width="800" height="600" style="border:1px solid #000;"></canvas>
+
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const peer = new Peer(); // Connects to public PeerJS server
+        const display = document.getElementById('display');
+        
+        // Use a static Peer ID for the room name if possible
+        // Note: PeerJS ID must be unique globally
+        let peer;
         let conn;
+        let balls = [];
 
-        // Draw function
-        function draw(x, y) {
-            ctx.fillRect(x, y, 5, 5);
-        }
-
-        // Send mouse position to peer
-        canvas.addEventListener('mousemove', (e) => {
-            if (e.buttons === 1) {
-                draw(e.offsetX, e.offsetY);
-                if (conn && conn.open) {
-                    conn.send({x: e.offsetX, y: e.offsetY});
-                }
-            }
-        });
-
-        // Listen for incoming connections (Host)
-        peer.on('connection', (c) => {
-            conn = c;
-            conn.on('data', (data) => draw(data.x, data.y));
-        });
-
-        // Function to connect to a specific ID (Client)
-        function connectToPeer(peerId) {
-            conn = peer.connect(peerId);
-            conn.on('open', () => {
-                conn.on('data', (data) => draw(data.x, data.y));
+        function hostRoom() {
+            const name = document.getElementById('roomName').value;
+            peer = new Peer(name); // Set custom ID as room name
+            peer.on('open', (id) => display.innerText = id);
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConnection();
             });
         }
 
-        // Log ID to share
-        peer.on('open', (id) => console.log('My ID:', id));
+        function joinRoom() {
+            const name = document.getElementById('roomName').value;
+            peer = new Peer(); 
+            peer.on('open', () => {
+                conn = peer.connect(name);
+                setupConnection();
+                display.innerText = name;
+            });
+        }
+
+        function setupConnection() {
+            conn.on('data', (data) => {
+                if (data.type === 'add') addBall(data.x, data.y);
+            });
+        }
+
+        function addBall(x, y) {
+            balls.push({ x, y, vy: 0 });
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, 800, 600);
+            balls.forEach(b => {
+                b.vy += 0.5;
+                b.y += b.vy;
+                if (b.y > 590) { b.y = 590; b.vy *= -0.8; }
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 10, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            requestAnimationFrame(update);
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            addBall(e.offsetX, e.offsetY);
+            if (conn && conn.open) {
+                conn.send({type: 'add', x: e.offsetX, y: e.offsetY});
+            }
+        });
+
+        update();
     </script>
 </body>
 </html>
